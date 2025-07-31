@@ -4,8 +4,7 @@ const CajaMenorControl = () => {
   const FONDO_INICIAL = 4000000;
   
   // Estados principales
-  const [ingresos, setIngresos] = useState(0);
-  const [egresos, setEgresos] = useState(0);
+  const [contadorTotal, setContadorTotal] = useState(0);
   const [historial, setHistorial] = useState([]);
   
   // Estados para formularios
@@ -30,8 +29,7 @@ const CajaMenorControl = () => {
     const datosGuardados = localStorage.getItem('cajaMenorData');
     if (datosGuardados) {
       const datos = JSON.parse(datosGuardados);
-      setIngresos(datos.ingresos || 0);
-      setEgresos(datos.egresos || 0);
+      setContadorTotal(datos.contadorTotal || 0);
       setHistorial(datos.historial || []);
     }
   }, []);
@@ -39,12 +37,11 @@ const CajaMenorControl = () => {
   // Guardar datos en localStorage cuando cambien
   useEffect(() => {
     const datos = {
-      ingresos,
-      egresos,
+      contadorTotal,
       historial
     };
     localStorage.setItem('cajaMenorData', JSON.stringify(datos));
-  }, [ingresos, egresos, historial]);
+  }, [contadorTotal, historial]);
 
   const formatearPesos = (valor) => {
     return new Intl.NumberFormat('es-CO', {
@@ -66,9 +63,9 @@ const CajaMenorControl = () => {
     setHistorial(prev => [nuevoMovimiento, ...prev]);
     
     if (tipo === 'ingreso') {
-      setIngresos(prev => prev + valor);
+      setContadorTotal(prev => prev + valor);
     } else if (tipo === 'egreso') {
-      setEgresos(prev => prev + valor);
+      setContadorTotal(prev => prev - valor);
     }
   };
 
