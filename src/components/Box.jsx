@@ -62,11 +62,8 @@ const CajaMenorControl = () => {
     
     setHistorial(prev => [nuevoMovimiento, ...prev]);
     
-    if (tipo === 'ingreso') {
-      setContadorTotal(prev => prev + valor);
-    } else if (tipo === 'egreso') {
-      setContadorTotal(prev => prev - valor);
-    }
+    // Todos los movimientos suman al contador total
+    setContadorTotal(prev => prev + valor);
   };
 
   const registrarBilletes = () => {
