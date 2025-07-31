@@ -1,755 +1,498 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, Minus, DollarSign, FileText, Receipt, Package } from 'lucide-react';
 
-const SistemaCajaMenor = () => {
-  // Utilidades para LocalStorage
-  const guardarDatos = (key, data) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(data));
-    }
-  };
-
-  const cargarDatos = (key) => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  };
-
+const CajaMenorControl = () => {
+  const FONDO_INICIAL = 4000000;
+  
   // Estados principales
-  const [presupuestoInicial] = useState(() => cargarDatos('caja-presupuesto-inicial') || 4000000);
-  const [presupuestoActual, setPresupuestoActual] = useState(() => cargarDatos('caja-presupuesto') || 4000000);
-  const [activeTab, setActiveTab] = useState('conteo');
-  const [datosCargados, setDatosCargados] = useState(false);
+  const [ingresos, setIngresos] = useState(0);
+  const [egresos, setEgresos] = useState(0);
+  const [historial, setHistorial] = useState([]);
+  
+  // Estados para formularios
+  const [activeTab, setActiveTab] = useState('billetes');
+  const [cantidadBilletes, setCantidadBilletes] = useState({});
+  const [cantidadMonedas, setCantidadMonedas] = useState({});
+  const [encomiendas, setEncomiendas] = useState({ tipo: '18000', cantidad: 0 });
+  const [factura, setFactura] = useState({ concepto: '', valor: 0 });
+  const [vale, setVale] = useState({ concepto: '', valor: 0 });
 
-  // Estados inicializados con localStorage
-  const [billetes, setBilletes] = useState(() =>
-    cargarDatos('caja-billetes') || {
-      100000: 0,
-      50000: 0,
-      20000: 0,
-      10000: 0,
-      5000: 0,
-      2000: 0
-    }
-  );
+  // Denominaciones
+  const denominacionesBilletes = [100000, 50000, 20000, 10000, 5000, 2000, 1000];
+  const denominacionesMonedas = [1000, 500, 200, 100, 50];
+  
+  const tiposEncomienda = [
+    { valor: 18000, label: '$18.000' },
+    { valor: 11000, label: '$11.000' }
+  ];
 
-  const [monedas, setMonedas] = useState(() =>
-    cargarDatos('caja-monedas') || {
-      1000: 0,
-      500: 0,
-      200: 0,
-      100: 0,
-      50: 0
-    }
-  );
-
-  const [facturas, setFacturas] = useState(() => cargarDatos('caja-facturas') || []);
-  const [vales, setVales] = useState(() => cargarDatos('caja-vales') || []);
-
-  // Formularios y edición
-  const [facturaForm, setFacturaForm] = useState({
-    fecha: '',
-    nit: '',
-    nombre: '',
-    numeroFactura: '',
-    descripcion: '',
-    valor: ''
-  });
-
-  const [valeForm, setValeForm] = useState({
-    fecha: '',
-    nit: '',
-    nombre: '',
-    concepto: '',
-    valor: ''
-  });
-
-  const [editingFactura, setEditingFactura] = useState(null);
-  const [editingVale, setEditingVale] = useState(null);
-
-  // Cargar presupuesto inicial en localStorage (una sola vez)
+  // Cargar datos del localStorage al iniciar
   useEffect(() => {
-    guardarDatos('caja-presupuesto-inicial', presupuestoInicial);
+    const datosGuardados = localStorage.getItem('cajaMenorData');
+    if (datosGuardados) {
+      const datos = JSON.parse(datosGuardados);
+      setIngresos(datos.ingresos || 0);
+      setEgresos(datos.egresos || 0);
+      setHistorial(datos.historial || []);
+    }
   }, []);
 
-  // Indicar que los datos se han cargado correctamente
+  // Guardar datos en localStorage cuando cambien
   useEffect(() => {
-    setDatosCargados(true);
-  }, []);
+    const datos = {
+      ingresos,
+      egresos,
+      historial
+    };
+    localStorage.setItem('cajaMenorData', JSON.stringify(datos));
+  }, [ingresos, egresos, historial]);
 
-  // Guardar cambios automáticos
-  useEffect(() => guardarDatos('caja-billetes', billetes), [billetes]);
-  useEffect(() => guardarDatos('caja-monedas', monedas), [monedas]);
-  useEffect(() => guardarDatos('caja-facturas', facturas), [facturas]);
-  useEffect(() => guardarDatos('caja-vales', vales), [vales]);
-
-  useEffect(() => {
-    if (!datosCargados) return;
-
-    const totalEfectivo = calcularTotalEfectivo();
-    const totalFacturas = calcularTotalFacturas();
-    const totalVales = calcularTotalVales();
-    const nuevoPresupuesto = totalEfectivo + totalFacturas + totalVales;
-
-    setPresupuestoActual(nuevoPresupuesto);
-    guardarDatos('caja-presupuesto', nuevoPresupuesto);
-  }, [billetes, monedas, facturas, vales, datosCargados]);
-
-  // Utilidades
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('es-CO', {
+  const formatearPesos = (valor) => {
+    return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
       minimumFractionDigits: 0
-    }).format(amount);
-
-  const calcularTotalEfectivo = () => {
-    const totalBilletes = Object.entries(billetes).reduce(
-      (sum, [valor, cantidad]) => sum + Number(valor) * Number(cantidad),
-      0
-    );
-    const totalMonedas = Object.entries(monedas).reduce(
-      (sum, [valor, cantidad]) => sum + Number(valor) * Number(cantidad),
-      0
-    );
-    return totalBilletes + totalMonedas;
+    }).format(valor);
   };
 
-  const calcularTotalFacturas = () =>
-    facturas.reduce((sum, factura) => sum + Number(factura.valor), 0);
-
-  const calcularTotalVales = () =>
-    vales.reduce((sum, vale) => sum + Number(vale.valor), 0);
-
-  // Handlers de formulario
-  const handleBilleteChange = (valor, cantidad) => {
-    setBilletes(prev => ({ ...prev, [valor]: Number(cantidad) || 0 }));
-  };
-
-  const handleMonedaChange = (valor, cantidad) => {
-    setMonedas(prev => ({ ...prev, [valor]: Number(cantidad) || 0 }));
-  };
-
-  const handleFacturaSubmit = (e) => {
-    e.preventDefault();
-    const valor = Number(facturaForm.valor);
-
-    if (valor > 200000) return alert('Las facturas no pueden exceder $200.000');
-
-    const totalEfectivo = calcularTotalEfectivo();
-    const totalVales = calcularTotalVales();
-    const presupuestoDisponible = presupuestoInicial - totalEfectivo - totalVales;
-
-    if (valor > presupuestoDisponible) {
-      return alert('No hay suficiente presupuesto disponible');
-    }
-
-    const nuevaFactura = {
-      ...facturaForm,
-      valor,
-      id: Date.now()
+  const agregarMovimiento = (tipo, detalle, valor) => {
+    const nuevoMovimiento = {
+      id: Date.now(),
+      fecha: new Date().toLocaleString('es-CO'),
+      tipo,
+      detalle,
+      valor
     };
-
-    if (editingFactura) {
-      setFacturas(prev => prev.map(f => f.id === editingFactura ? nuevaFactura : f));
-      setEditingFactura(null);
+    
+    setHistorial(prev => [nuevoMovimiento, ...prev]);
+    
+    if (tipo === 'ingreso') {
+      setIngresos(prev => prev + valor);
     } else {
-      setFacturas(prev => [...prev, nuevaFactura]);
-    }
-
-    setFacturaForm({
-      fecha: '', nit: '', nombre: '', numeroFactura: '', descripcion: '', valor: ''
-    });
-  };
-
-  const handleValeSubmit = (e) => {
-    e.preventDefault();
-    const valor = Number(valeForm.valor);
-
-    if (valor > 200000) return alert('Los vales no pueden exceder $200.000');
-
-    const totalEjecutado = presupuestoActual + valor;
-    if (totalEjecutado > presupuestoInicial) {
-      return alert('No hay suficiente presupuesto disponible. Presupuesto restante: ' +
-        formatCurrency(presupuestoInicial - presupuestoActual));
-    }
-
-    const nuevoVale = {
-      ...valeForm,
-      valor,
-      id: Date.now()
-    };
-
-    if (editingVale) {
-      setVales(prev => prev.map(v => v.id === editingVale ? nuevoVale : v));
-      setEditingVale(null);
-    } else {
-      setVales(prev => [...prev, nuevoVale]);
-    }
-
-    setValeForm({
-      fecha: '', nit: '', nombre: '', concepto: '', valor: ''
-    });
-  };
-
-  // Handlers de edición y eliminación
-  const eliminarFactura = (id) => {
-    if (confirm('¿Estás seguro de que quieres eliminar esta factura?')) {
-      setFacturas(prev => prev.filter(f => f.id !== id));
+      setEgresos(prev => prev + valor);
     }
   };
 
-  const eliminarVale = (id) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este vale?')) {
-      setVales(prev => prev.filter(v => v.id !== id));
-    }
-  };
-
-  const editarFactura = (factura) => {
-    setFacturaForm(factura);
-    setEditingFactura(factura.id);
-    setActiveTab('facturas');
-  };
-
-  const editarVale = (vale) => {
-    setValeForm(vale);
-    setEditingVale(vale.id);
-    setActiveTab('vales');
-  };
-
-  // Reset general
-  const limpiarTodosLosDatos = () => {
-    if (confirm('¿Estás seguro de que quieres limpiar todos los datos? Esta acción no se puede deshacer.')) {
-      setBilletes({ 100000: 0, 50000: 0, 20000: 0, 10000: 0, 5000: 0, 2000: 0 });
-      setMonedas({ 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0 });
-      setFacturas([]);
-      setVales([]);
-      setEditingFactura(null);
-      setEditingVale(null);
-      setFacturaForm({ fecha: '', nit: '', nombre: '', numeroFactura: '', descripcion: '', valor: '' });
-      setValeForm({ fecha: '', nit: '', nombre: '', concepto: '', valor: '' });
-
-      ['caja-billetes', 'caja-monedas', 'caja-facturas', 'caja-vales', 'caja-presupuesto', 'caja-presupuesto-inicial']
-        .forEach(key => localStorage.removeItem(key));
-
-      alert('Todos los datos han sido limpiados exitosamente.');
-    }
-  };
-
-  const exportarDatos = () => {
-    const datos = {
-      fecha_exportacion: new Date().toISOString(),
-      presupuesto_inicial: presupuestoInicial,
-      presupuesto_actual: presupuestoActual,
-      billetes,
-      monedas,
-      facturas,
-      vales,
-      totales: {
-        efectivo: calcularTotalEfectivo(),
-        facturas: calcularTotalFacturas(),
-        vales: calcularTotalVales()
+  const registrarBilletes = () => {
+    let total = 0;
+    let detalle = 'Billetes: ';
+    let items = [];
+    
+    Object.entries(cantidadBilletes).forEach(([denominacion, cantidad]) => {
+      if (cantidad > 0) {
+        const valor = parseInt(denominacion) * cantidad;
+        total += valor;
+        items.push(`${cantidad} x ${formatearPesos(parseInt(denominacion))}`);
       }
-    };
-
-    const dataStr = JSON.stringify(datos, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `caja_menor_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
+    });
+    
+    if (total > 0) {
+      detalle += items.join(', ');
+      agregarMovimiento('ingreso', detalle, total);
+      setCantidadBilletes({});
+    }
   };
+
+  const registrarMonedas = () => {
+    let total = 0;
+    let detalle = 'Monedas: ';
+    let items = [];
+    
+    Object.entries(cantidadMonedas).forEach(([denominacion, cantidad]) => {
+      if (cantidad > 0) {
+        const valor = parseInt(denominacion) * cantidad;
+        total += valor;
+        items.push(`${cantidad} x ${formatearPesos(parseInt(denominacion))}`);
+      }
+    });
+    
+    if (total > 0) {
+      detalle += items.join(', ');
+      agregarMovimiento('ingreso', detalle, total);
+      setCantidadMonedas({});
+    }
+  };
+
+  const registrarEncomienda = () => {
+    if (encomiendas.cantidad > 0) {
+      const valorUnitario = parseInt(encomiendas.tipo);
+      const total = valorUnitario * encomiendas.cantidad;
+      const detalle = `Encomiendas: ${encomiendas.cantidad} x ${formatearPesos(valorUnitario)}`;
+      
+      agregarMovimiento('ingreso', detalle, total);
+      setEncomiendas({ tipo: '18000', cantidad: 0 });
+    }
+  };
+
+  const registrarFactura = () => {
+    if (factura.concepto && factura.valor > 0) {
+      const detalle = `Factura: ${factura.concepto}`;
+      agregarMovimiento('egreso', detalle, factura.valor);
+      setFactura({ concepto: '', valor: 0 });
+    }
+  };
+
+  const registrarVale = () => {
+    if (vale.concepto && vale.valor > 0) {
+      const detalle = `Vale: ${vale.concepto}`;
+      agregarMovimiento('egreso', detalle, vale.valor);
+      setVale({ concepto: '', valor: 0 });
+    }
+  };
+
+  const saldoActual = FONDO_INICIAL + ingresos - egresos;
+
+  const resetearDatos = () => {
+    if (window.confirm('¿Está seguro de que desea resetear todos los datos? Esta acción no se puede deshacer.')) {
+      setIngresos(0);
+      setEgresos(0);
+      setHistorial([]);
+      setCantidadBilletes({});
+      setCantidadMonedas({});
+      setEncomiendas({ tipo: '18000', cantidad: 0 });
+      setFactura({ concepto: '', valor: 0 });
+      setVale({ concepto: '', valor: 0 });
+      localStorage.removeItem('cajaMenorData');
+    }
+  };
+
+  const tabs = [
+    { id: 'billetes', label: 'Billetes', icon: DollarSign },
+    { id: 'monedas', label: 'Monedas', icon: DollarSign },
+    { id: 'encomiendas', label: 'Encomiendas', icon: Package },
+    { id: 'facturas', label: 'Facturas', icon: FileText },
+    { id: 'vales', label: 'Vales', icon: Receipt }
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4 flex items-center">
-          💰 Sistema de Caja Menor
-        </h1>
-
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-blue-800 text-sm">
-            💾 <strong>Persistencia de Datos:</strong> En tu propio proyecto, todos los datos se guardan automáticamente en localStorage.
-            En este entorno de demostración, los datos se mantienen durante la sesión actual.
-          </p>
-        </div>
-
-        {/* Botones de acción */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={exportarDatos}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center text-sm"
-          >
-            📊 Exportar Datos
-          </button>
-          <button
-            onClick={limpiarTodosLosDatos}
-            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center text-sm"
-          >
-            🗑️ Limpiar Todo
-          </button>
-        </div>
-
-        {/* Resumen financiero */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-blue-800">Presupuesto Inicial</h3>
-            <p className="text-2xl font-bold text-blue-600">{formatCurrency(presupuestoInicial)}</p>
-          </div>
-          <div className="bg-green-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-green-800">Presupuesto Actual</h3>
-            <p className="text-2xl font-bold text-green-600">{formatCurrency(presupuestoActual)}</p>
-          </div>
-          <div className="bg-orange-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-orange-800">Total Ejecutado</h3>
-            <p className="text-2xl font-bold text-orange-600">
-              {formatCurrency(calcularTotalFacturas() + calcularTotalVales())}
-            </p>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-purple-800">Efectivo en Caja</h3>
-            <p className="text-2xl font-bold text-purple-600">{formatCurrency(calcularTotalEfectivo())}</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">
+            Sistema de Control de Caja Menor
+          </h1>
+          
+          {/* Resumen financiero */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <h3 className="text-sm font-medium text-blue-600 mb-1">Fondo Inicial</h3>
+              <p className="text-2xl font-bold text-blue-800">{formatearPesos(FONDO_INICIAL)}</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <h3 className="text-sm font-medium text-green-600 mb-1">Total Ingresos</h3>
+              <p className="text-2xl font-bold text-green-800">{formatearPesos(ingresos)}</p>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <h3 className="text-sm font-medium text-red-600 mb-1">Total Egresos</h3>
+              <p className="text-2xl font-bold text-red-800">{formatearPesos(egresos)}</p>
+            </div>
+            <div className={`p-4 rounded-lg border-2 ${saldoActual >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-orange-50 border-orange-300'}`}>
+              <h3 className={`text-sm font-medium mb-1 ${saldoActual >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                Saldo Actual
+              </h3>
+              <p className={`text-2xl font-bold ${saldoActual >= 0 ? 'text-emerald-800' : 'text-orange-800'}`}>
+                {formatearPesos(saldoActual)}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Navegación por pestañas */}
-      <div className="bg-white rounded-lg shadow-md mb-6">
-        <div className="flex border-b">
-          <button
-            onClick={() => setActiveTab('conteo')}
-            className={`flex items-center px-6 py-3 font-medium ${activeTab === 'conteo'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            🧮 Conteo de Efectivo
-          </button>
-          <button
-            onClick={() => setActiveTab('facturas')}
-            className={`flex items-center px-6 py-3 font-medium ${activeTab === 'facturas'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            🧾 Facturas ({facturas.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('vales')}
-            className={`flex items-center px-6 py-3 font-medium ${activeTab === 'vales'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            📄 Vales ({vales.length})
-          </button>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Panel de registro */}
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-lg">
+            {/* Tabs */}
+            <div className="border-b border-gray-200">
+              <nav className="flex overflow-x-auto">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
+                        activeTab === tab.id
+                          ? 'border-blue-500 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <Icon size={16} />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
 
-        {/* Contenido de las pestañas */}
-        <div className="p-6">
-          {/* Pestaña de Conteo de Efectivo */}
-          {activeTab === 'conteo' && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Conteo de Efectivo</h2>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Billetes */}
+            <div className="p-6">
+              {/* Billetes */}
+              {activeTab === 'billetes' && (
                 <div>
-                  <h3 className="text-xl font-semibold mb-4 text-green-700">Billetes</h3>
-                  <div className="space-y-4">
-                    {Object.entries(billetes).map(([valor, cantidad]) => (
-                      <div key={valor} className="flex items-center justify-between bg-green-50 p-3 rounded-lg">
-                        <span className="font-medium">{formatCurrency(Number(valor))}</span>
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="number"
-                            min="0"
-                            value={cantidad}
-                            onChange={(e) => handleBilleteChange(valor, e.target.value)}
-                            className="w-20 px-3 py-1 border rounded-md text-center"
-                          />
-                          <span className="text-sm text-gray-600 min-w-[100px] text-right">
-                            = {formatCurrency(Number(valor) * cantidad)}
-                          </span>
-                        </div>
+                  <h3 className="text-lg font-semibold mb-4">Registro de Billetes</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                    {denominacionesBilletes.map(denominacion => (
+                      <div key={denominacion} className="border rounded-lg p-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {formatearPesos(denominacion)}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={cantidadBilletes[denominacion] || ''}
+                          onChange={(e) => setCantidadBilletes(prev => ({
+                            ...prev,
+                            [denominacion]: parseInt(e.target.value) || 0
+                          }))}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          placeholder="0"
+                        />
                       </div>
                     ))}
                   </div>
-
-                  <div className="mt-4 p-3 bg-green-100 rounded-lg">
-                    <span className="font-bold">Total Billetes: {formatCurrency(
-                      Object.entries(billetes).reduce((sum, [valor, cantidad]) =>
-                        sum + (Number(valor) * Number(cantidad)), 0)
-                    )}</span>
-                  </div>
+                  <button
+                    onClick={registrarBilletes}
+                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="inline mr-2" size={16} />
+                    Registrar Billetes
+                  </button>
                 </div>
+              )}
 
-                {/* Monedas */}
+              {/* Monedas */}
+              {activeTab === 'monedas' && (
                 <div>
-                  <h3 className="text-xl font-semibold mb-4 text-amber-700">Monedas</h3>
-                  <div className="space-y-4">
-                    {Object.entries(monedas).map(([valor, cantidad]) => (
-                      <div key={valor} className="flex items-center justify-between bg-amber-50 p-3 rounded-lg">
-                        <span className="font-medium">{formatCurrency(Number(valor))}</span>
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="number"
-                            min="0"
-                            value={cantidad}
-                            onChange={(e) => handleMonedaChange(valor, e.target.value)}
-                            className="w-20 px-3 py-1 border rounded-md text-center"
-                          />
-                          <span className="text-sm text-gray-600 min-w-[100px] text-right">
-                            = {formatCurrency(Number(valor) * cantidad)}
-                          </span>
-                        </div>
+                  <h3 className="text-lg font-semibold mb-4">Registro de Monedas</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                    {denominacionesMonedas.map(denominacion => (
+                      <div key={denominacion} className="border rounded-lg p-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {formatearPesos(denominacion)}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={cantidadMonedas[denominacion] || ''}
+                          onChange={(e) => setCantidadMonedas(prev => ({
+                            ...prev,
+                            [denominacion]: parseInt(e.target.value) || 0
+                          }))}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          placeholder="0"
+                        />
                       </div>
                     ))}
                   </div>
-
-                  <div className="mt-4 p-3 bg-amber-100 rounded-lg">
-                    <span className="font-bold">Total Monedas: {formatCurrency(
-                      Object.entries(monedas).reduce((sum, [valor, cantidad]) =>
-                        sum + (Number(valor) * Number(cantidad)), 0)
-                    )}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 p-4 bg-blue-100 rounded-lg text-center">
-                <h3 className="text-2xl font-bold text-blue-800">
-                  Total Efectivo en Caja: {formatCurrency(calcularTotalEfectivo())}
-                </h3>
-              </div>
-            </div>
-          )}
-
-          {/* Pestaña de Facturas */}
-          {activeTab === 'facturas' && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Registro de Facturas</h2>
-
-              {/* Formulario de factura */}
-              <form onSubmit={handleFacturaSubmit} className="bg-gray-50 p-6 rounded-lg mb-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  {editingFactura ? 'Editar Factura' : 'Nueva Factura'}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <input
-                    type="date"
-                    placeholder="Fecha de Emisión"
-                    value={facturaForm.fecha}
-                    onChange={(e) => setFacturaForm({ ...facturaForm, fecha: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="NIT"
-                    value={facturaForm.nit}
-                    onChange={(e) => setFacturaForm({ ...facturaForm, nit: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nombre"
-                    value={facturaForm.nombre}
-                    onChange={(e) => setFacturaForm({ ...facturaForm, nombre: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Número de Factura"
-                    value={facturaForm.numeroFactura}
-                    onChange={(e) => setFacturaForm({ ...facturaForm, numeroFactura: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Descripción"
-                    value={facturaForm.descripcion}
-                    onChange={(e) => setFacturaForm({ ...facturaForm, descripcion: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="number"
-                    placeholder="Valor (COP)"
-                    max="200000"
-                    value={facturaForm.valor}
-                    onChange={(e) => setFacturaForm({ ...facturaForm, valor: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                </div>
-                <div className="mt-4 flex space-x-2">
                   <button
-                    type="submit"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+                    onClick={registrarMonedas}
+                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    ➕ {editingFactura ? 'Actualizar' : 'Registrar'} Factura
+                    <Plus className="inline mr-2" size={16} />
+                    Registrar Monedas
                   </button>
-                  {editingFactura && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingFactura(null);
-                        setFacturaForm({
-                          fecha: '',
-                          nit: '',
-                          nombre: '',
-                          numeroFactura: '',
-                          descripcion: '',
-                          valor: ''
-                        });
-                      }}
-                      className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
-                    >
-                      Cancelar
-                    </button>
-                  )}
                 </div>
-              </form>
+              )}
 
-              {/* Lista de facturas */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">
-                  Facturas Registradas ({facturas.length})
-                </h3>
-                {facturas.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No hay facturas registradas</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 px-4 py-2 text-left">Fecha</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">NIT</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">Nombre</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">N° Factura</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">Descripción</th>
-                          <th className="border border-gray-300 px-4 py-2 text-right">Valor</th>
-                          <th className="border border-gray-300 px-4 py-2 text-center">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {facturas.map((factura) => (
-                          <tr key={factura.id} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-2">{factura.fecha}</td>
-                            <td className="border border-gray-300 px-4 py-2">{factura.nit}</td>
-                            <td className="border border-gray-300 px-4 py-2">{factura.nombre}</td>
-                            <td className="border border-gray-300 px-4 py-2">{factura.numeroFactura}</td>
-                            <td className="border border-gray-300 px-4 py-2">{factura.descripcion}</td>
-                            <td className="border border-gray-300 px-4 py-2 text-right font-semibold">
-                              {formatCurrency(factura.valor)}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-2 text-center">
-                              <div className="flex justify-center space-x-2">
-                                <button
-                                  onClick={() => editarFactura(factura)}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Editar"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  onClick={() => eliminarFactura(factura.id)}
-                                  className="text-red-600 hover:text-red-800"
-                                  title="Eliminar"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+              {/* Encomiendas */}
+              {activeTab === 'encomiendas' && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Registro de Encomiendas</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tipo de Encomienda
+                      </label>
+                      <select
+                        value={encomiendas.tipo}
+                        onChange={(e) => setEncomiendas(prev => ({ ...prev, tipo: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      >
+                        {tiposEncomienda.map(tipo => (
+                          <option key={tipo.valor} value={tipo.valor}>
+                            {tipo.label}
+                          </option>
                         ))}
-                      </tbody>
-                    </table>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Cantidad
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={encomiendas.cantidad || ''}
+                        onChange={(e) => setEncomiendas(prev => ({ 
+                          ...prev, 
+                          cantidad: parseInt(e.target.value) || 0 
+                        }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        placeholder="0"
+                      />
+                    </div>
+                    {encomiendas.cantidad > 0 && (
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                          Total: {formatearPesos(parseInt(encomiendas.tipo) * encomiendas.cantidad)}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {facturas.length > 0 && (
-                  <div className="mt-4 p-4 bg-blue-100 rounded-lg text-right">
-                    <span className="text-lg font-bold">
-                      Total Facturas: {formatCurrency(calcularTotalFacturas())}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Pestaña de Vales */}
-          {activeTab === 'vales' && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Registro de Vales</h2>
-
-              {/* Formulario de vale */}
-              <form onSubmit={handleValeSubmit} className="bg-gray-50 p-6 rounded-lg mb-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  {editingVale ? 'Editar Vale' : 'Nuevo Vale'}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <input
-                    type="date"
-                    placeholder="Fecha"
-                    value={valeForm.fecha}
-                    onChange={(e) => setValeForm({ ...valeForm, fecha: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="NIT"
-                    value={valeForm.nit}
-                    onChange={(e) => setValeForm({ ...valeForm, nit: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nombre"
-                    value={valeForm.nombre}
-                    onChange={(e) => setValeForm({ ...valeForm, nombre: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Concepto"
-                    value={valeForm.concepto}
-                    onChange={(e) => setValeForm({ ...valeForm, concepto: e.target.value })}
-                    className="px-3 py-2 border rounded-md md:col-span-2"
-                    required
-                  />
-                  <input
-                    type="number"
-                    placeholder="Valor (COP)"
-                    max="200000"
-                    value={valeForm.valor}
-                    onChange={(e) => setValeForm({ ...valeForm, valor: e.target.value })}
-                    className="px-3 py-2 border rounded-md"
-                    required
-                  />
-                </div>
-                <div className="mt-4 flex space-x-2">
                   <button
-                    type="submit"
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
+                    onClick={registrarEncomienda}
+                    className="w-full mt-4 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    ➕ {editingVale ? 'Actualizar' : 'Registrar'} Vale
+                    <Plus className="inline mr-2" size={16} />
+                    Registrar Encomienda
                   </button>
-                  {editingVale && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingVale(null);
-                        setValeForm({
-                          fecha: '',
-                          nit: '',
-                          nombre: '',
-                          concepto: '',
-                          valor: ''
-                        });
-                      }}
-                      className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
-                    >
-                      Cancelar
-                    </button>
-                  )}
                 </div>
-              </form>
+              )}
 
-              {/* Lista de vales */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">
-                  Vales Registrados ({vales.length})
-                </h3>
-                {vales.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No hay vales registrados</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 px-4 py-2 text-left">Fecha</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">NIT</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">Nombre</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">Concepto</th>
-                          <th className="border border-gray-300 px-4 py-2 text-right">Valor</th>
-                          <th className="border border-gray-300 px-4 py-2 text-center">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {vales.map((vale) => (
-                          <tr key={vale.id} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-2">{vale.fecha}</td>
-                            <td className="border border-gray-300 px-4 py-2">{vale.nit}</td>
-                            <td className="border border-gray-300 px-4 py-2">{vale.nombre}</td>
-                            <td className="border border-gray-300 px-4 py-2">{vale.concepto}</td>
-                            <td className="border border-gray-300 px-4 py-2 text-right font-semibold">
-                              {formatCurrency(vale.valor)}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-2 text-center">
-                              <div className="flex justify-center space-x-2">
-                                <button
-                                  onClick={() => editarVale(vale)}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Editar"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  onClick={() => eliminarVale(vale.id)}
-                                  className="text-red-600 hover:text-red-800"
-                                  title="Eliminar"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* Facturas */}
+              {activeTab === 'facturas' && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Registro de Facturas</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Concepto
+                      </label>
+                      <input
+                        type="text"
+                        value={factura.concepto}
+                        onChange={(e) => setFactura(prev => ({ ...prev, concepto: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        placeholder="Descripción del gasto"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Valor
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={factura.valor || ''}
+                        onChange={(e) => setFactura(prev => ({ 
+                          ...prev, 
+                          valor: parseInt(e.target.value) || 0 
+                        }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
-                )}
+                  <button
+                    onClick={registrarFactura}
+                    className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    <Minus className="inline mr-2" size={16} />
+                    Registrar Factura
+                  </button>
+                </div>
+              )}
 
-                {vales.length > 0 && (
-                  <div className="mt-4 p-4 bg-green-100 rounded-lg text-right">
-                    <span className="text-lg font-bold">
-                      Total Vales: {formatCurrency(calcularTotalVales())}
-                    </span>
+              {/* Vales */}
+              {activeTab === 'vales' && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Registro de Vales</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Concepto
+                      </label>
+                      <input
+                        type="text"
+                        value={vale.concepto}
+                        onChange={(e) => setVale(prev => ({ ...prev, concepto: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        placeholder="Descripción del vale"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Valor
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={vale.valor || ''}
+                        onChange={(e) => setVale(prev => ({ 
+                          ...prev, 
+                          valor: parseInt(e.target.value) || 0 
+                        }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
-                )}
+                  <button
+                    onClick={registrarVale}
+                    className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    <Minus className="inline mr-2" size={16} />
+                    Registrar Vale
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Historial */}
+          <div className="bg-white rounded-xl shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Historial de Movimientos</h3>
+                <button
+                  onClick={resetearDatos}
+                  className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded-md hover:bg-red-200 transition-colors"
+                >
+                  Resetear Todo
+                </button>
               </div>
             </div>
-          )}
+            <div className="p-6 max-h-96 overflow-y-auto">
+              {historial.length === 0 ? (
+                <p className="text-gray-500 text-center">No hay movimientos registrados</p>
+              ) : (
+                <div className="space-y-3">
+                  {historial.map((movimiento) => (
+                    <div
+                      key={movimiento.id}
+                      className={`p-3 rounded-lg border-l-4 ${
+                        movimiento.tipo === 'ingreso'
+                          ? 'bg-green-50 border-green-400'
+                          : 'bg-red-50 border-red-400'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            {movimiento.detalle}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {movimiento.fecha}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-sm font-bold ${
+                            movimiento.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        >
+                          {movimiento.tipo === 'ingreso' ? '+' : '-'}
+                          {formatearPesos(movimiento.valor)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Información de implementación */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
-        <h3 className="font-bold text-yellow-800 mb-2">📋 Instrucciones para implementar localStorage:</h3>
-        <p className="text-yellow-700 text-sm mb-2">
-          Para que los datos se guarden permanentemente cuando copies este código a tu proyecto:
-        </p>
-        <ol className="text-yellow-700 text-sm list-decimal list-inside space-y-1">
-          <li>Descomenta las líneas que dicen "localStorage.setItem" en la función guardarDatos</li>
-          <li>Descomenta las líneas que dicen "localStorage.getItem" en la función cargarDatos</li>
-          <li>Descomenta la línea "localStorage.removeItem" en la función limpiarTodosLosDatos</li>
-        </ol>
-        <p className="text-yellow-700 text-sm mt-2">
-          ✅ Con estos cambios, todos tus datos se guardarán automáticamente y permanecerán al recargar la página.
-        </p>
       </div>
     </div>
   );
 };
 
-export default SistemaCajaMenor;
+export default CajaMenorControl;
