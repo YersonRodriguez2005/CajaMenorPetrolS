@@ -136,12 +136,11 @@ const CajaMenorControl = () => {
     }
   };
 
-  const saldoActual = FONDO_INICIAL + ingresos - egresos;
+  const saldoActual = FONDO_INICIAL + contadorTotal;
 
   const resetearDatos = () => {
     if (window.confirm('¿Está seguro de que desea resetear todos los datos? Esta acción no se puede deshacer.')) {
-      setIngresos(0);
-      setEgresos(0);
+      setContadorTotal(0);
       setHistorial([]);
       setCantidadBilletes({});
       setCantidadMonedas({});
@@ -170,18 +169,18 @@ const CajaMenorControl = () => {
           </h1>
           
           {/* Resumen financiero */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="text-sm font-medium text-blue-600 mb-1">Fondo Inicial</h3>
               <p className="text-2xl font-bold text-blue-800">{formatearPesos(FONDO_INICIAL)}</p>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <h3 className="text-sm font-medium text-green-600 mb-1">Total Ingresos</h3>
-              <p className="text-2xl font-bold text-green-800">{formatearPesos(ingresos)}</p>
-            </div>
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-              <h3 className="text-sm font-medium text-red-600 mb-1">Total Egresos</h3>
-              <p className="text-2xl font-bold text-red-800">{formatearPesos(egresos)}</p>
+            <div className={`p-4 rounded-lg border ${contadorTotal >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+              <h3 className={`text-sm font-medium mb-1 ${contadorTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                Contador Total
+              </h3>
+              <p className={`text-2xl font-bold ${contadorTotal >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                {formatearPesos(contadorTotal)}
+              </p>
             </div>
             <div className={`p-4 rounded-lg border-2 ${saldoActual >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-orange-50 border-orange-300'}`}>
               <h3 className={`text-sm font-medium mb-1 ${saldoActual >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
