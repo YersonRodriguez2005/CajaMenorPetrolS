@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Download, Edit, Trash2, Save, X } from 'lucide-react';
 
 const CajaMenorControl = () => {
   const FONDO_INICIAL = 4000000;
@@ -6,6 +7,8 @@ const CajaMenorControl = () => {
   // Estados principales
   const [contadorTotal, setContadorTotal] = useState(0);
   const [historial, setHistorial] = useState([]);
+  const [editandoId, setEditandoId] = useState(null);
+  const [editandoValores, setEditandoValores] = useState({});
   
   // Estados para formularios
   const [activeTab, setActiveTab] = useState('billetes');
@@ -61,9 +64,126 @@ const CajaMenorControl = () => {
     };
     
     setHistorial(prev => [nuevoMovimiento, ...prev]);
-    
-    // Todos los movimientos suman al contador total
     setContadorTotal(prev => prev + valor);
+  };
+
+  const editarMovimiento = (id) => {
+    const movimiento = historial.find(m => m.id === id);
+    setEditandoId(id);
+    setEditandoValores({
+      detalle: movimiento.detalle,
+      valor: movimiento.valor
+    });
+  };
+
+  const guardarEdicion = (id) => {
+    const movimientoOriginal = historial.find(m => m.id === id);
+    const diferencia = editandoValores.valor - movimientoOriginal.valor;
+    
+    setHistorial(prev => prev.map(m => 
+      m.id === id 
+        ? { ...m, detalle: editandoValores.detalle, valor: editandoValores.valor }
+        : m
+    ));
+    
+    setContadorTotal(prev => prev + diferencia);
+    setEditandoId(null);
+    setEditandoValores({});
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+    setEditandoValores({});
+  };
+
+  const eliminarMovimiento = (id) => {
+    if (window.confirm('¿Está seguro de que desea eliminar este registro?')) {
+      const movimiento = historial.find(m => m.id === id);
+      setHistorial(prev => prev.filter(m => m.id !== id));
+      setContadorTotal(prev => prev - movimiento.valor);
+    }
+  };
+
+  const generarPDF = (categoria = 'todos') => {
+    let movimientosFiltrados = historial;
+    
+    if (categoria !== 'todos') {
+      movimientosFiltrados = historial.filter(m => 
+        m.detalle.toLowerCase().includes(categoria.toLowerCase())
+      );
+    }
+
+    // Crear contenido HTML para el PDF
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Reporte Caja Menor - ${categoria}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .ingreso { color: green; }
+          .egreso { color: red; }
+          .total { font-weight: bold; background-color: #e8f4fd; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Sistema de Control de Caja Menor</h1>
+          <h2>Reporte: ${categoria.charAt(0).toUpperCase() + categoria.slice(1)}</h2>
+          <p>Fecha de generación: ${new Date().toLocaleString('es-CO')}</p>
+        </div>
+        
+        <div class="summary">
+          <h3>Resumen Financiero</h3>
+          <p><strong>Fondo Inicial:</strong> ${formatearPesos(FONDO_INICIAL)}</p>
+          <p><strong>Total Movimientos:</strong> ${formatearPesos(contadorTotal)}</p>
+          <p><strong>Saldo Actual:</strong> ${formatearPesos(FONDO_INICIAL + contadorTotal)}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Detalle</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${movimientosFiltrados.map(m => `
+              <tr>
+                <td>${m.fecha}</td>
+                <td class="${m.tipo}">${m.tipo.toUpperCase()}</td>
+                <td>${m.detalle}</td>
+                <td class="${m.tipo}">${m.tipo === 'ingreso' ? '+' : '-'}${formatearPesos(m.valor)}</td>
+              </tr>
+            `).join('')}
+            <tr class="total">
+              <td colspan="3"><strong>TOTAL</strong></td>
+              <td><strong>${formatearPesos(movimientosFiltrados.reduce((sum, m) => sum + m.valor, 0))}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    // Crear y descargar el PDF
+    const printWindow = window.open('', '', 'height=600,width=800');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   const registrarBilletes = () => {
@@ -186,6 +306,55 @@ const CajaMenorControl = () => {
               <p className={`text-2xl font-bold ${saldoActual >= 0 ? 'text-emerald-800' : 'text-orange-800'}`}>
                 {formatearPesos(saldoActual)}
               </p>
+            </div>
+          </div>
+
+          {/* Botones de descarga PDF */}
+          <div className="mt-6 border-t pt-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Descargar Reportes PDF:</h4>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => generarPDF('todos')}
+                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors"
+              >
+                <Download size={16} />
+                Todos los Movimientos
+              </button>
+              <button
+                onClick={() => generarPDF('billetes')}
+                className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-md text-sm hover:bg-green-700 transition-colors"
+              >
+                <Download size={16} />
+                Billetes
+              </button>
+              <button
+                onClick={() => generarPDF('monedas')}
+                className="flex items-center gap-2 bg-yellow-600 text-white px-3 py-2 rounded-md text-sm hover:bg-yellow-700 transition-colors"
+              >
+                <Download size={16} />
+                Monedas
+              </button>
+              <button
+                onClick={() => generarPDF('encomiendas')}
+                className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded-md text-sm hover:bg-purple-700 transition-colors"
+              >
+                <Download size={16} />
+                Encomiendas
+              </button>
+              <button
+                onClick={() => generarPDF('facturas')}
+                className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-md text-sm hover:bg-red-700 transition-colors"
+              >
+                <Download size={16} />
+                Facturas
+              </button>
+              <button
+                onClick={() => generarPDF('vales')}
+                className="flex items-center gap-2 bg-orange-600 text-white px-3 py-2 rounded-md text-sm hover:bg-orange-700 transition-colors"
+              >
+                <Download size={16} />
+                Vales
+              </button>
             </div>
           </div>
         </div>
@@ -448,24 +617,77 @@ const CajaMenorControl = () => {
                           : 'bg-red-50 border-red-400'
                       }`}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">
-                            {movimiento.detalle}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {movimiento.fecha}
-                          </p>
+                      {editandoId === movimiento.id ? (
+                        // Modo edición
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editandoValores.detalle}
+                            onChange={(e) => setEditandoValores(prev => ({ ...prev, detalle: e.target.value }))}
+                            className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                          />
+                          <input
+                            type="number"
+                            value={editandoValores.valor}
+                            onChange={(e) => setEditandoValores(prev => ({ ...prev, valor: parseInt(e.target.value) || 0 }))}
+                            className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => guardarEdicion(movimiento.id)}
+                              className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                            >
+                              <Save size={12} />
+                              Guardar
+                            </button>
+                            <button
+                              onClick={cancelarEdicion}
+                              className="flex items-center gap-1 bg-gray-600 text-white px-2 py-1 rounded text-xs hover:bg-gray-700"
+                            >
+                              <X size={12} />
+                              Cancelar
+                            </button>
+                          </div>
                         </div>
-                        <span
-                          className={`text-sm font-bold ${
-                            movimiento.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {movimiento.tipo === 'ingreso' ? '+' : '-'}
-                          {formatearPesos(movimiento.valor)}
-                        </span>
-                      </div>
+                      ) : (
+                        // Modo visualización
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              {movimiento.detalle}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {movimiento.fecha}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-sm font-bold ${
+                                movimiento.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
+                              }`}
+                            >
+                              {movimiento.tipo === 'ingreso' ? '+' : '-'}
+                              {formatearPesos(movimiento.valor)}
+                            </span>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => editarMovimiento(movimiento.id)}
+                                className="text-blue-600 hover:text-blue-800 p-1"
+                                title="Editar"
+                              >
+                                <Edit size={12} />
+                              </button>
+                              <button
+                                onClick={() => eliminarMovimiento(movimiento.id)}
+                                className="text-red-600 hover:text-red-800 p-1"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
