@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, DollarSign, FileText, Receipt, Package } from 'lucide-react';
 
 const CajaMenorControl = () => {
   const FONDO_INICIAL = 4000000;
@@ -68,7 +67,7 @@ const CajaMenorControl = () => {
     
     if (tipo === 'ingreso') {
       setIngresos(prev => prev + valor);
-    } else {
+    } else if (tipo === 'egreso') {
       setEgresos(prev => prev + valor);
     }
   };
@@ -157,11 +156,11 @@ const CajaMenorControl = () => {
   };
 
   const tabs = [
-    { id: 'billetes', label: 'Billetes', icon: DollarSign },
-    { id: 'monedas', label: 'Monedas', icon: DollarSign },
-    { id: 'encomiendas', label: 'Encomiendas', icon: Package },
-    { id: 'facturas', label: 'Facturas', icon: FileText },
-    { id: 'vales', label: 'Vales', icon: Receipt }
+    { id: 'billetes', label: '💵 Billetes' },
+    { id: 'monedas', label: '🪙 Monedas' },
+    { id: 'encomiendas', label: '📦 Encomiendas' },
+    { id: 'facturas', label: '📄 Facturas' },
+    { id: 'vales', label: '🧾 Vales' }
   ];
 
   return (
@@ -204,23 +203,19 @@ const CajaMenorControl = () => {
             {/* Tabs */}
             <div className="border-b border-gray-200">
               <nav className="flex overflow-x-auto">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
-                        activeTab === tab.id
-                          ? 'border-blue-500 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Icon size={16} />
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </nav>
             </div>
 
@@ -253,8 +248,7 @@ const CajaMenorControl = () => {
                     onClick={registrarBilletes}
                     className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Plus className="inline mr-2" size={16} />
-                    Registrar Billetes
+                    ➕ Registrar Billetes
                   </button>
                 </div>
               )}
@@ -287,8 +281,7 @@ const CajaMenorControl = () => {
                     onClick={registrarMonedas}
                     className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Plus className="inline mr-2" size={16} />
-                    Registrar Monedas
+                    ➕ Registrar Monedas
                   </button>
                 </div>
               )}
@@ -342,8 +335,7 @@ const CajaMenorControl = () => {
                     onClick={registrarEncomienda}
                     className="w-full mt-4 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Plus className="inline mr-2" size={16} />
-                    Registrar Encomienda
+                    ➕ Registrar Encomienda
                   </button>
                 </div>
               )}
@@ -386,8 +378,7 @@ const CajaMenorControl = () => {
                     onClick={registrarFactura}
                     className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
                   >
-                    <Minus className="inline mr-2" size={16} />
-                    Registrar Factura
+                    ➖ Registrar Factura
                   </button>
                 </div>
               )}
@@ -430,8 +421,7 @@ const CajaMenorControl = () => {
                     onClick={registrarVale}
                     className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
                   >
-                    <Minus className="inline mr-2" size={16} />
-                    Registrar Vale
+                    ➖ Registrar Vale
                   </button>
                 </div>
               )}
