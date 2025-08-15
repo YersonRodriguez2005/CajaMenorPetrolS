@@ -143,7 +143,7 @@ const CajaMenorControl = () => {
           <h3>Resumen Financiero</h3>
           <p><strong>Fondo Inicial:</strong> ${formatearPesos(FONDO_INICIAL)}</p>
           <p><strong>Total Movimientos:</strong> ${formatearPesos(contadorTotal)}</p>
-          <p><strong>Saldo Actual:</strong> ${formatearPesos(FONDO_INICIAL + contadorTotal)}</p>
+          <p><strong>Saldo Actual:</strong> ${formatearPesos(FONDO_INICIAL - contadorTotal)}</p>
         </div>
 
         <table>
