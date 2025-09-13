@@ -1,11 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, MinusCircle, Trash2, DollarSign, FileText, Calendar } from 'lucide-react';
 
-const CajaMenorDashboard = () => {
+const Register = () => {
   const [registros, setRegistros] = useState([]);
   const [concepto, setConcepto] = useState('');
   const [valor, setValor] = useState('');
-  const [tipo, setTipo] = useState('entrada'); // 'entrada' o 'salida'
+  const [tipo, setTipo] = useState('entrada');
+
+  // Cargar datos desde localStorage al montar el componente
+  useEffect(() => {
+    const datosGuardados = localStorage.getItem('cajaMenorRegistros');
+    if (datosGuardados) {
+      try {
+        const registrosParseados = JSON.parse(datosGuardados);
+        setRegistros(registrosParseados);
+      } catch (error) {
+        console.error('Error al cargar datos guardados:', error);
+      }
+    }
+  }, []);
+
+  // Guardar datos en localStorage cada vez que cambien los registros
+  useEffect(() => {
+    localStorage.setItem('cajaMenorRegistros', JSON.stringify(registros));
+  }, [registros]);
 
   // Formatear número a pesos colombianos
   const formatearPesos = (numero) => {
@@ -69,18 +87,6 @@ const CajaMenorDashboard = () => {
     }
   };
 
-  // Calcular totales
-  const totalEntradas = registros
-    .filter(r => r.tipo === 'entrada')
-    .reduce((sum, r) => sum + r.valor, 0);
-  
-  const totalSalidas = registros
-    .filter(r => r.tipo === 'salida')
-    .reduce((sum, r) => sum + r.valor, 0);
-  
-  // eslint-disable-next-line no-unused-vars
-  const saldo = totalEntradas - totalSalidas;
-
   // Manejar cambio en el input de valor
   const manejarCambioValor = (e) => {
     const value = e.target.value.replace(/[^\d]/g, '');
@@ -99,8 +105,6 @@ const CajaMenorDashboard = () => {
           <p className="text-gray-600 mt-2">Gestión de entradas y salidas de caja menor</p>
         </div>
 
-
-
         {/* Formulario */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -116,8 +120,8 @@ const CajaMenorDashboard = () => {
                 onChange={(e) => setTipo(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="salida">📉 Salida</option>
                 <option value="entrada">📈 Entrada</option>
+                <option value="salida">📉 Salida</option>
               </select>
             </div>
             
@@ -255,4 +259,4 @@ const CajaMenorDashboard = () => {
   );
 };
 
-export default CajaMenorDashboard;
+export default Register;
