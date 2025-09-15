@@ -7,29 +7,23 @@ const Register = () => {
   const [valor, setValor] = useState('');
   const [tipo, setTipo] = useState('entrada');
 
-  // Cargar datos desde localStorage al montar el componente
+  // Cargar datos desde localStorage al iniciar el componente
   useEffect(() => {
-  try {
-    const datosGuardados = JSON.parse(localStorage.getItem('cajaMenorRegistros')) || [];
-    if (Array.isArray(datosGuardados)) {
-      setRegistros(datosGuardados);
+    const datosGuardados = localStorage.getItem('cajaMenorRegistros');
+    if (datosGuardados) {
+      try {
+        const parsed = JSON.parse(datosGuardados);
+        if (Array.isArray(parsed)) setRegistros(parsed);
+      } catch (error) {
+        console.error('Error al cargar datos:', error);
+      }
     }
-  } catch (error) {
-    console.error('Error al cargar datos guardados:', error);
-    setRegistros([]); // fallback
-  }
-}, []);
+  }, []);
 
-
-  // Guardar datos en localStorage cada vez que cambien los registros
+  // Guardar datos en localStorage cuando cambien los registros
   useEffect(() => {
-  try {
     localStorage.setItem('cajaMenorRegistros', JSON.stringify(registros));
-  } catch (error) {
-    console.error('Error al guardar registros:', error);
-  }
-}, [registros]);
-
+  }, [registros]);
 
   // Formatear número a pesos colombianos
   const formatearPesos = (numero) => {
@@ -75,7 +69,7 @@ const Register = () => {
 
   // Eliminar registro individual
   const eliminarRegistro = (id) => {
-    if (confirm('¿Estás seguro de eliminar este registro?')) {
+    if (window.confirm('¿Estás seguro de eliminar este registro?')) {
       setRegistros(registros.filter(registro => registro.id !== id));
     }
   };
@@ -86,9 +80,9 @@ const Register = () => {
       alert('No hay registros para eliminar');
       return;
     }
-    
+
     const cantidadAEliminar = Math.min(10, registros.length);
-    if (confirm(`¿Estás seguro de eliminar los primeros ${cantidadAEliminar} registros?`)) {
+    if (window.confirm(`¿Estás seguro de eliminar los primeros ${cantidadAEliminar} registros?`)) {
       setRegistros(registros.slice(cantidadAEliminar));
     }
   };
@@ -117,12 +111,12 @@ const Register = () => {
             <PlusCircle className="text-blue-600" size={24} />
             Nuevo Registro
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
-              <select 
-                value={tipo} 
+              <select
+                value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
@@ -130,7 +124,7 @@ const Register = () => {
                 <option value="salida">📉 Salida</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Concepto</label>
               <input
@@ -141,7 +135,7 @@ const Register = () => {
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Valor (COP)</label>
               <input
@@ -157,7 +151,7 @@ const Register = () => {
                 </p>
               )}
             </div>
-            
+
             <div className="flex items-end">
               <button
                 onClick={agregarRegistro}
@@ -177,7 +171,7 @@ const Register = () => {
               <FileText className="text-gray-600" size={24} />
               Historial de Registros ({registros.length})
             </h2>
-            
+
             {registros.length > 0 && (
               <button
                 onClick={eliminarPrimeros10}
@@ -226,8 +220,8 @@ const Register = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          registro.tipo === 'entrada' 
-                            ? 'bg-green-100 text-green-800' 
+                          registro.tipo === 'entrada'
+                            ? 'bg-green-100 text-green-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
                           {registro.tipo === 'entrada' ? <PlusCircle size={14} /> : <MinusCircle size={14} />}
