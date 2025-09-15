@@ -9,21 +9,27 @@ const Register = () => {
 
   // Cargar datos desde localStorage al montar el componente
   useEffect(() => {
-    const datosGuardados = localStorage.getItem('cajaMenorRegistros');
-    if (datosGuardados) {
-      try {
-        const registrosParseados = JSON.parse(datosGuardados);
-        setRegistros(registrosParseados);
-      } catch (error) {
-        console.error('Error al cargar datos guardados:', error);
-      }
+  try {
+    const datosGuardados = JSON.parse(localStorage.getItem('cajaMenorRegistros')) || [];
+    if (Array.isArray(datosGuardados)) {
+      setRegistros(datosGuardados);
     }
-  }, []);
+  } catch (error) {
+    console.error('Error al cargar datos guardados:', error);
+    setRegistros([]); // fallback
+  }
+}, []);
+
 
   // Guardar datos en localStorage cada vez que cambien los registros
   useEffect(() => {
+  try {
     localStorage.setItem('cajaMenorRegistros', JSON.stringify(registros));
-  }, [registros]);
+  } catch (error) {
+    console.error('Error al guardar registros:', error);
+  }
+}, [registros]);
+
 
   // Formatear número a pesos colombianos
   const formatearPesos = (numero) => {
