@@ -114,11 +114,11 @@ export default function App() {
           <p style={{ color: '#7c6f5a', fontSize: 12, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
             Desarrollado por{' '}
             <a
-              href="https://github.com/YersonRodriguez2005"
+              href="www.linkedin.com/in/yerson-rodriguez"
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                color: '#4f46e5', // Color índigo que resalta
+                color: '#4f46e5',
                 textDecoration: 'none',
                 fontWeight: 700
               }}
