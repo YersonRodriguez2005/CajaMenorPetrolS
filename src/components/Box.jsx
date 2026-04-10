@@ -1,16 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Edit, Trash2, Save, X } from 'lucide-react';
+import { Download, Edit, Trash2, Save, X, TrendingDown, TrendingUp, Banknote, Coins, Package, Receipt, FileCheck } from 'lucide-react';
 
-const CajaMenorControl = () => {
-  const FONDO_INICIAL = 4000000;
-  
-  // Estados principales
+const FONDO_INICIAL = 4000000;
+
+const formatearPesos = (valor) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(valor);
+
+const denominacionesBilletes = [100000, 50000, 20000, 10000, 5000, 2000, 1000];
+const denominacionesMonedas = [1000, 500, 200, 100, 50];
+const tiposEncomienda = [{ valor: 18000, label: '$18.000' }, { valor: 11000, label: '$11.000' }];
+
+const tabs = [
+  { id: 'billetes', label: 'Billetes', icon: Banknote, color: '#10b981' },
+  { id: 'monedas', label: 'Monedas', icon: Coins, color: '#f59e0b' },
+  { id: 'encomiendas', label: 'Encomiendas', icon: Package, color: '#6366f1' },
+  { id: 'facturas', label: 'Facturas', icon: Receipt, color: '#ef4444' },
+  { id: 'vales', label: 'Vales', icon: FileCheck, color: '#f97316' },
+];
+
+export default function CajaMenorControl() {
   const [contadorTotal, setContadorTotal] = useState(0);
   const [historial, setHistorial] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [editandoValores, setEditandoValores] = useState({});
-  
-  // Estados para formularios
   const [activeTab, setActiveTab] = useState('billetes');
   const [cantidadBilletes, setCantidadBilletes] = useState({});
   const [cantidadMonedas, setCantidadMonedas] = useState({});
@@ -18,686 +30,470 @@ const CajaMenorControl = () => {
   const [factura, setFactura] = useState({ concepto: '', valor: 0 });
   const [vale, setVale] = useState({ concepto: '', valor: 0 });
 
-  // Denominaciones
-  const denominacionesBilletes = [100000, 50000, 20000, 10000, 5000, 2000, 1000];
-  const denominacionesMonedas = [1000, 500, 200, 100, 50];
-  
-  const tiposEncomienda = [
-    { valor: 18000, label: '$18.000' },
-    { valor: 11000, label: '$11.000' }
-  ];
-
-  // Cargar datos del localStorage al iniciar
   useEffect(() => {
-    const datosGuardados = localStorage.getItem('cajaMenorData');
-    if (datosGuardados) {
-      const datos = JSON.parse(datosGuardados);
+    const d = localStorage.getItem('cajaMenorData');
+    if (d) {
+      const datos = JSON.parse(d);
       setContadorTotal(datos.contadorTotal || 0);
       setHistorial(datos.historial || []);
     }
   }, []);
 
-  // Guardar datos en localStorage cuando cambien
   useEffect(() => {
-    const datos = {
-      contadorTotal,
-      historial
-    };
-    localStorage.setItem('cajaMenorData', JSON.stringify(datos));
+    localStorage.setItem('cajaMenorData', JSON.stringify({ contadorTotal, historial }));
   }, [contadorTotal, historial]);
 
-  const formatearPesos = (valor) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(valor);
-  };
-
-  const agregarMovimiento = (tipo, detalle, valor) => {
-    const nuevoMovimiento = {
-      id: Date.now(),
-      fecha: new Date().toLocaleString('es-CO'),
-      tipo,
-      detalle,
-      valor
-    };
-    
-    setHistorial(prev => [nuevoMovimiento, ...prev]);
-    setContadorTotal(prev => prev + valor);
-  };
-
-  const editarMovimiento = (id) => {
-    const movimiento = historial.find(m => m.id === id);
-    setEditandoId(id);
-    setEditandoValores({
-      detalle: movimiento.detalle,
-      valor: movimiento.valor
-    });
+  // Se añade el parámetro "desglose" para guardar las cantidades exactas
+  const agregarMovimiento = (tipo, detalle, valor, desglose = null) => {
+    const m = { id: Date.now(), fecha: new Date().toLocaleString('es-CO'), tipo, detalle, valor, desglose };
+    setHistorial(prev => [m, ...prev]);
+    setContadorTotal(prev => prev + (tipo === 'ingreso' ? valor : -valor));
   };
 
   const guardarEdicion = (id) => {
-    const movimientoOriginal = historial.find(m => m.id === id);
-    const diferencia = editandoValores.valor - movimientoOriginal.valor;
-    
-    setHistorial(prev => prev.map(m => 
-      m.id === id 
-        ? { ...m, detalle: editandoValores.detalle, valor: editandoValores.valor }
-        : m
-    ));
-    
-    setContadorTotal(prev => prev + diferencia);
-    setEditandoId(null);
-    setEditandoValores({});
-  };
+    const original = historial.find(m => m.id === id);
+    const nuevoValor = Number(editandoValores.valor);
+    const diferencia = nuevoValor - original.valor;
 
-  const cancelarEdicion = () => {
+    let nuevoDetalle = editandoValores.detalle;
+    
+    // Si la edición fue de billetes/monedas (tiene desglose), reconstruimos el texto automáticamente
+    if (editandoValores.desglose) {
+      let items = [];
+      Object.entries(editandoValores.desglose).forEach(([d, c]) => {
+        if (c > 0) items.push(`${c} × ${formatearPesos(+d)}`);
+      });
+      const prefix = original.detalle.split(':')[0] + ': ';
+      nuevoDetalle = items.length > 0 ? prefix + items.join(', ') : prefix + '0';
+    }
+
+    setHistorial(prev => prev.map(m => m.id === id ? { ...m, detalle: nuevoDetalle, valor: nuevoValor, desglose: editandoValores.desglose } : m));
+    setContadorTotal(prev => prev + (original.tipo === 'ingreso' ? diferencia : -diferencia));
     setEditandoId(null);
-    setEditandoValores({});
   };
 
   const eliminarMovimiento = (id) => {
-    if (window.confirm('¿Está seguro de que desea eliminar este registro?')) {
-      const movimiento = historial.find(m => m.id === id);
-      setHistorial(prev => prev.filter(m => m.id !== id));
-      setContadorTotal(prev => prev - movimiento.valor);
-    }
-  };
-
-  const generarPDF = (categoria = 'todos') => {
-    let movimientosFiltrados = historial;
-    
-    if (categoria !== 'todos') {
-      movimientosFiltrados = historial.filter(m => 
-        m.detalle.toLowerCase().includes(categoria.toLowerCase())
-      );
-    }
-
-    // Crear contenido HTML para el PDF
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Reporte Caja Menor - ${categoria}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; }
-          .ingreso { color: green; }
-          .egreso { color: red; }
-          .total { font-weight: bold; background-color: #e8f4fd; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Sistema de Control de Caja Menor</h1>
-          <h2>Reporte: ${categoria.charAt(0).toUpperCase() + categoria.slice(1)}</h2>
-          <p>Fecha de generación: ${new Date().toLocaleString('es-CO')}</p>
-        </div>
-        
-        <div class="summary">
-          <h3>Resumen Financiero</h3>
-          <p><strong>Fondo Inicial:</strong> ${formatearPesos(FONDO_INICIAL)}</p>
-          <p><strong>Total Movimientos:</strong> ${formatearPesos(contadorTotal)}</p>
-          <p><strong>Saldo Actual:</strong> ${formatearPesos(FONDO_INICIAL - contadorTotal)}</p>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Detalle</th>
-              <th>Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${movimientosFiltrados.map(m => `
-              <tr>
-                <td>${m.fecha}</td>
-                <td class="${m.tipo}">${m.tipo.toUpperCase()}</td>
-                <td>${m.detalle}</td>
-                <td class="${m.tipo}">${m.tipo === 'ingreso' ? '+' : '-'}${formatearPesos(m.valor)}</td>
-              </tr>
-            `).join('')}
-            <tr class="total">
-              <td colspan="3"><strong>TOTAL</strong></td>
-              <td><strong>${formatearPesos(movimientosFiltrados.reduce((sum, m) => sum + m.valor, 0))}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    // Crear y descargar el PDF
-    const printWindow = window.open('', '', 'height=600,width=800');
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.focus();
-    
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
+    if (!window.confirm('¿Eliminar este registro?')) return;
+    const m = historial.find(x => x.id === id);
+    setHistorial(prev => prev.filter(x => x.id !== id));
+    setContadorTotal(prev => prev + (m.tipo === 'ingreso' ? -m.valor : m.valor));
   };
 
   const registrarBilletes = () => {
-    let total = 0;
-    let detalle = 'Billetes: ';
-    let items = [];
-    
-    Object.entries(cantidadBilletes).forEach(([denominacion, cantidad]) => {
-      if (cantidad > 0) {
-        const valor = parseInt(denominacion) * cantidad;
-        total += valor;
-        items.push(`${cantidad} x ${formatearPesos(parseInt(denominacion))}`);
-      }
+    let total = 0; let items = []; let desglose = {};
+    Object.entries(cantidadBilletes).forEach(([d, c]) => { 
+      if (c > 0) { 
+        total += +d * c; 
+        items.push(`${c} × ${formatearPesos(+d)}`); 
+        desglose[d] = c; // Guardamos la cantidad exacta de esta denominación
+      } 
     });
-    
-    if (total > 0) {
-      detalle += items.join(', ');
-      agregarMovimiento('ingreso', detalle, total);
-      setCantidadBilletes({});
-    }
+    if (total > 0) { agregarMovimiento('ingreso', 'Billetes: ' + items.join(', '), total, desglose); setCantidadBilletes({}); }
   };
 
   const registrarMonedas = () => {
-    let total = 0;
-    let detalle = 'Monedas: ';
-    let items = [];
-    
-    Object.entries(cantidadMonedas).forEach(([denominacion, cantidad]) => {
-      if (cantidad > 0) {
-        const valor = parseInt(denominacion) * cantidad;
-        total += valor;
-        items.push(`${cantidad} x ${formatearPesos(parseInt(denominacion))}`);
-      }
+    let total = 0; let items = []; let desglose = {};
+    Object.entries(cantidadMonedas).forEach(([d, c]) => { 
+      if (c > 0) { 
+        total += +d * c; 
+        items.push(`${c} × ${formatearPesos(+d)}`); 
+        desglose[d] = c; // Guardamos la cantidad exacta de esta denominación
+      } 
     });
-    
-    if (total > 0) {
-      detalle += items.join(', ');
-      agregarMovimiento('ingreso', detalle, total);
-      setCantidadMonedas({});
-    }
+    if (total > 0) { agregarMovimiento('ingreso', 'Monedas: ' + items.join(', '), total, desglose); setCantidadMonedas({}); }
   };
 
   const registrarEncomienda = () => {
     if (encomiendas.cantidad > 0) {
-      const valorUnitario = parseInt(encomiendas.tipo);
-      const total = valorUnitario * encomiendas.cantidad;
-      const detalle = `Encomiendas: ${encomiendas.cantidad} x ${formatearPesos(valorUnitario)}`;
-      
-      agregarMovimiento('ingreso', detalle, total);
+      const val = +encomiendas.tipo * encomiendas.cantidad;
+      agregarMovimiento('ingreso', `Encomiendas: ${encomiendas.cantidad} × ${formatearPesos(+encomiendas.tipo)}`, val);
       setEncomiendas({ tipo: '18000', cantidad: 0 });
     }
   };
 
   const registrarFactura = () => {
     if (factura.concepto && factura.valor > 0) {
-      const detalle = `Factura: ${factura.concepto}`;
-      agregarMovimiento('egreso', detalle, factura.valor);
+      agregarMovimiento('egreso', `Factura: ${factura.concepto}`, factura.valor);
       setFactura({ concepto: '', valor: 0 });
     }
   };
 
   const registrarVale = () => {
     if (vale.concepto && vale.valor > 0) {
-      const detalle = `Vale: ${vale.concepto}`;
-      agregarMovimiento('egreso', detalle, vale.valor);
+      agregarMovimiento('egreso', `Vale: ${vale.concepto}`, vale.valor);
       setVale({ concepto: '', valor: 0 });
     }
   };
 
-  const saldoActual = FONDO_INICIAL + contadorTotal;
+  const generarPDF = (categoria = 'todos') => {
+    const filtrados = categoria === 'todos' ? historial : historial.filter(m => m.detalle.toLowerCase().includes(categoria));
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reporte Caja Menor</title>
+    <style>body{font-family: 'Inter', sans-serif;margin:40px;color:#1a1a2e}h1{color:#1a1a2e;border-bottom:3px solid #c8a96e;padding-bottom:10px}
+    .summary{background:#f8f4ee;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #c8a96e}
+    table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#1a1a2e;color:#c8a96e;padding:10px;text-align:left}
+    td{padding:8px 10px;border-bottom:1px solid #e0d5c5}.ingreso{color:#059669}.egreso{color:#dc2626}
+    .total{font-weight:bold;background:#f8f4ee}</style></head><body>
+    <h1>Reporte de Caja Menor — ${categoria.charAt(0).toUpperCase() + categoria.slice(1)}</h1>
+    <div class="summary">
+      <p><strong>Fondo Inicial:</strong> ${formatearPesos(FONDO_INICIAL)}</p>
+      <p><strong>Saldo Actual:</strong> ${formatearPesos(FONDO_INICIAL + contadorTotal)}</p>
+      <p><strong>Generado:</strong> ${new Date().toLocaleString('es-CO')}</p>
+    </div>
+    <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Valor</th></tr></thead><tbody>
+    ${filtrados.map(m => `<tr><td>${m.fecha}</td><td class="${m.tipo}">${m.tipo.toUpperCase()}</td><td>${m.detalle}</td>
+    <td class="${m.tipo}">${m.tipo === 'ingreso' ? '+' : '-'}${formatearPesos(m.valor)}</td></tr>`).join('')}
+    <tr class="total"><td colspan="3">TOTAL</td><td>${formatearPesos(filtrados.reduce((s, m) => s + m.valor, 0))}</td></tr>
+    </tbody></table></body></html>`;
+    const w = window.open('', '', 'height=600,width=800');
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => { w.print(); w.close(); }, 250);
+  };
+
+  const saldoActual = contadorTotal;
+  const porcentaje = Math.max(0, Math.min(100, (saldoActual / FONDO_INICIAL) * 100));
+  const activeTabData = tabs.find(t => t.id === activeTab);
 
   const resetearDatos = () => {
-    if (window.confirm('¿Está seguro de que desea resetear todos los datos? Esta acción no se puede deshacer.')) {
-      setContadorTotal(0);
-      setHistorial([]);
-      setCantidadBilletes({});
-      setCantidadMonedas({});
-      setEncomiendas({ tipo: '18000', cantidad: 0 });
-      setFactura({ concepto: '', valor: 0 });
-      setVale({ concepto: '', valor: 0 });
-      localStorage.removeItem('cajaMenorData');
-    }
+    if (!window.confirm('¿Resetear todos los datos? Esta acción no se puede deshacer.')) return;
+    setContadorTotal(0); setHistorial([]); setCantidadBilletes({}); setCantidadMonedas({});
+    setEncomiendas({ tipo: '18000', cantidad: 0 }); setFactura({ concepto: '', valor: 0 }); setVale({ concepto: '', valor: 0 });
+    localStorage.removeItem('cajaMenorData');
   };
 
-  const tabs = [
-    { id: 'billetes', label: '💵 Billetes' },
-    { id: 'monedas', label: '🪙 Monedas' },
-    { id: 'encomiendas', label: '📦 Encomiendas' },
-    { id: 'facturas', label: '📄 Facturas' },
-    { id: 'vales', label: '🧾 Vales' }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">
-            Sistema de Control de Caja Menor
-          </h1>
-          
-          {/* Resumen financiero */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h3 className="text-sm font-medium text-blue-600 mb-1">Fondo Inicial</h3>
-              <p className="text-2xl font-bold text-blue-800">{formatearPesos(FONDO_INICIAL)}</p>
+    <div style={{ minHeight: '100vh', background: '#f4f1eb', padding: '24px' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap');
+        .caja-root { font-family: 'Inter', sans-serif; }
+        .caja-heading { font-family: 'Inter', sans-serif; }
+        .tab-btn { transition: all 0.3s ease; border: none; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-btn:hover { background: rgba(0,0,0,0.02); }
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.05); }
+        .action-btn { border: none; cursor: pointer; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all 0.2s; }
+        .action-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+        .input-field { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 14px; background: #f8fafc; color: #1a1a2e; transition: all 0.2s; box-sizing: border-box; }
+        .input-field:focus { outline: none; border-color: #c8a96e; background: #fff; }
+        .hist-item { border-radius: 12px; padding: 16px; margin-bottom: 12px; transition: all 0.2s; border: 1px solid transparent; }
+        .hist-item:hover { transform: scale(1.01); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .progress-bar { height: 12px; border-radius: 99px; background: #f1f5f9; overflow: hidden; border: 1px solid rgba(0,0,0,0.03); }
+        .progress-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+        select.input-field { cursor: pointer; }
+      `}</style>
+      <div className="caja-root" style={{ maxWidth: 1100, margin: '0 auto' }}>
+
+        {/* ── Header ── */}
+        <div className="card" style={{ padding: '32px', marginBottom: 24 }}>
+          <h1 className="caja-heading" style={{ color: '#1a1a2e', fontSize: 28, margin: '0 0 6px', fontWeight: 800 }}>Control de Caja Menor</h1>
+          <p style={{ color: '#64748b', fontSize: 15, margin: '0 0 32px' }}>Balance de fondo autorizado: <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{formatearPesos(FONDO_INICIAL)}</span></p>
+
+          <div style={{ background: '#1a1a2e', borderRadius: 20, padding: '32px', marginBottom: 24, boxShadow: '0 20px 25px -5px rgba(26,26,46,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+              <div>
+                <p style={{ color: '#c8a96e', fontSize: 13, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px', fontWeight: 600 }}>Saldo Disponible</p>
+                <p className="caja-heading" style={{ color: '#fff', fontSize: 42, margin: 0, lineHeight: 1, fontWeight: 700 }}>{formatearPesos(saldoActual)}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ color: '#9ca3af', fontSize: 12, margin: '0 0 2px' }}>del fondo inicial</p>
+                <p style={{ color: porcentaje > 50 ? '#10b981' : porcentaje > 25 ? '#f59e0b' : '#ef4444', fontSize: 22, fontWeight: 700, margin: 0 }}>
+                  {porcentaje.toFixed(1)}%
+                </p>
+              </div>
             </div>
-            <div className={`p-4 rounded-lg border ${contadorTotal >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-              <h3 className={`text-sm font-medium mb-1 ${contadorTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                Contador Total
-              </h3>
-              <p className={`text-2xl font-bold ${contadorTotal >= 0 ? 'text-green-800' : 'text-red-800'}`}>
-                {formatearPesos(contadorTotal)}
-              </p>
-            </div>
-            <div className={`p-4 rounded-lg border-2 ${saldoActual >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-orange-50 border-orange-300'}`}>
-              <h3 className={`text-sm font-medium mb-1 ${saldoActual >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                Saldo Actual
-              </h3>
-              <p className={`text-2xl font-bold ${saldoActual >= 0 ? 'text-emerald-800' : 'text-orange-800'}`}>
-                {formatearPesos(saldoActual)}
-              </p>
+            <div className="progress-bar">
+              <div className="progress-fill" style={{
+                width: `${porcentaje}%`,
+                background: porcentaje > 50 ? 'linear-gradient(90deg,#059669,#10b981)' : porcentaje > 25 ? 'linear-gradient(90deg,#d97706,#f59e0b)' : 'linear-gradient(90deg,#dc2626,#ef4444)'
+              }} />
             </div>
           </div>
 
-          {/* Botones de descarga PDF */}
-          <div className="mt-6 border-t pt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Descargar Reportes PDF:</h4>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => generarPDF('todos')}
-                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors"
-              >
-                <Download size={16} />
-                Todos los Movimientos
-              </button>
-              <button
-                onClick={() => generarPDF('billetes')}
-                className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-md text-sm hover:bg-green-700 transition-colors"
-              >
-                <Download size={16} />
-                Billetes
-              </button>
-              <button
-                onClick={() => generarPDF('monedas')}
-                className="flex items-center gap-2 bg-yellow-600 text-white px-3 py-2 rounded-md text-sm hover:bg-yellow-700 transition-colors"
-              >
-                <Download size={16} />
-                Monedas
-              </button>
-              <button
-                onClick={() => generarPDF('encomiendas')}
-                className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded-md text-sm hover:bg-purple-700 transition-colors"
-              >
-                <Download size={16} />
-                Encomiendas
-              </button>
-              <button
-                onClick={() => generarPDF('facturas')}
-                className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-md text-sm hover:bg-red-700 transition-colors"
-              >
-                <Download size={16} />
-                Facturas
-              </button>
-              <button
-                onClick={() => generarPDF('vales')}
-                className="flex items-center gap-2 bg-orange-600 text-white px-3 py-2 rounded-md text-sm hover:bg-orange-700 transition-colors"
-              >
-                <Download size={16} />
-                Vales
-              </button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
+            {[
+              { label: 'Fondo Inicial', value: formatearPesos(FONDO_INICIAL), color: '#c8a96e', bg: '#faf8f4' },
+              { label: 'Saldo Actual', value: formatearPesos(saldoActual), color: saldoActual >= 2000000 ? '#059669' : saldoActual >= 1000000 ? '#d97706' : '#dc2626', bg: '#f8f4ee', bold: true },
+            ].map((c, i) => (
+              <div key={i} style={{ background: c.bg, borderRadius: 10, padding: '14px 16px', border: '1.5px solid #e2d9c8' }}>
+                <p style={{ color: '#7c6f5a', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', margin: '0 0 4px' }}>{c.label}</p>
+                <p style={{ color: c.color, fontSize: 18, fontWeight: c.bold ? 700 : 600, margin: 0 }}>{c.prefix || ''}{c.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: '1.5px solid #e2d9c8', paddingTop: 16 }}>
+            <p style={{ color: '#7c6f5a', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', margin: '0 0 10px' }}>Descargar Reportes</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {[
+                { label: 'Todos', cat: 'todos', color: '#1a1a2e' },
+                { label: 'Billetes', cat: 'billetes', color: '#10b981' },
+                { label: 'Monedas', cat: 'monedas', color: '#f59e0b' },
+                { label: 'Encomiendas', cat: 'encomiendas', color: '#6366f1' },
+                { label: 'Facturas', cat: 'facturas', color: '#ef4444' },
+                { label: 'Vales', cat: 'vales', color: '#f97316' },
+              ].map(btn => (
+                <button key={btn.cat} className="action-btn" onClick={() => generarPDF(btn.cat)}
+                  style={{ background: btn.color, color: '#fff', padding: '7px 14px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Download size={14} /> {btn.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Panel de registro */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-lg">
-            {/* Tabs */}
-            <div className="border-b border-gray-200">
-              <nav className="flex overflow-x-auto">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
-                      activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {tab.label}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 20 }}>
+
+          {/* ── Panel de Registro ── */}
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'flex', borderBottom: '1.5px solid #e2d9c8', overflowX: 'auto' }}>
+              {tabs.map(tab => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
+                return (
+                  <button key={tab.id} className="tab-btn" onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      padding: '14px 18px', fontSize: 13, fontWeight: 600, fontFamily: "'Source Sans 3',sans-serif",
+                      background: active ? '#fff' : '#faf8f4',
+                      color: active ? tab.color : '#9ca3af',
+                      borderBottom: active ? `3px solid ${tab.color}` : '3px solid transparent',
+                      whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                    <Icon size={15} />{tab.label}
                   </button>
-                ))}
-              </nav>
+                );
+              })}
             </div>
 
-            <div className="p-6">
-              {/* Billetes */}
+            <div style={{ padding: 24 }}>
+              <p className="caja-heading" style={{ fontSize: 18, color: '#1a1a2e', margin: '0 0 20px' }}>
+                Registrar — {activeTabData?.label}
+              </p>
+
               {activeTab === 'billetes' && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Registro de Billetes</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                    {denominacionesBilletes.map(denominacion => (
-                      <div key={denominacion} className="border rounded-lg p-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {formatearPesos(denominacion)}
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={cantidadBilletes[denominacion] || ''}
-                          onChange={(e) => setCantidadBilletes(prev => ({
-                            ...prev,
-                            [denominacion]: parseInt(e.target.value) || 0
-                          }))}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                          placeholder="0"
-                        />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 16 }}>
+                    {denominacionesBilletes.map(d => (
+                      <div key={d} style={{ background: '#faf8f4', borderRadius: 10, padding: '10px 12px', border: '1.5px solid #e2d9c8' }}>
+                        <label style={{ display: 'block', fontSize: 12, color: '#7c6f5a', marginBottom: 4, fontWeight: 600 }}>{formatearPesos(d)}</label>
+                        <input type="number" min="0" placeholder="0" className="input-field"
+                          value={cantidadBilletes[d] || ''} style={{ marginTop: 0 }}
+                          onChange={e => setCantidadBilletes(p => ({ ...p, [d]: +e.target.value || 0 }))} />
+                        {(cantidadBilletes[d] > 0) && (
+                          <p style={{ fontSize: 11, color: '#10b981', margin: '4px 0 0', fontWeight: 600 }}>= {formatearPesos(d * cantidadBilletes[d])}</p>
+                        )}
                       </div>
                     ))}
                   </div>
-                  <button
-                    onClick={registrarBilletes}
-                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    ➕ Registrar Billetes
+                  <button className="action-btn" onClick={registrarBilletes}
+                    style={{ width: '100%', padding: '12px', background: '#10b981', color: '#fff' }}>
+                    + Registrar Billetes
                   </button>
                 </div>
               )}
 
-              {/* Monedas */}
               {activeTab === 'monedas' && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Registro de Monedas</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                    {denominacionesMonedas.map(denominacion => (
-                      <div key={denominacion} className="border rounded-lg p-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {formatearPesos(denominacion)}
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={cantidadMonedas[denominacion] || ''}
-                          onChange={(e) => setCantidadMonedas(prev => ({
-                            ...prev,
-                            [denominacion]: parseInt(e.target.value) || 0
-                          }))}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                          placeholder="0"
-                        />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 16 }}>
+                    {denominacionesMonedas.map(d => (
+                      <div key={d} style={{ background: '#faf8f4', borderRadius: 10, padding: '10px 12px', border: '1.5px solid #e2d9c8' }}>
+                        <label style={{ display: 'block', fontSize: 12, color: '#7c6f5a', marginBottom: 4, fontWeight: 600 }}>{formatearPesos(d)}</label>
+                        <input type="number" min="0" placeholder="0" className="input-field"
+                          value={cantidadMonedas[d] || ''}
+                          onChange={e => setCantidadMonedas(p => ({ ...p, [d]: +e.target.value || 0 }))} />
+                        {(cantidadMonedas[d] > 0) && (
+                          <p style={{ fontSize: 11, color: '#f59e0b', margin: '4px 0 0', fontWeight: 600 }}>= {formatearPesos(d * cantidadMonedas[d])}</p>
+                        )}
                       </div>
                     ))}
                   </div>
-                  <button
-                    onClick={registrarMonedas}
-                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    ➕ Registrar Monedas
+                  <button className="action-btn" onClick={registrarMonedas}
+                    style={{ width: '100%', padding: '12px', background: '#f59e0b', color: '#fff' }}>
+                    + Registrar Monedas
                   </button>
                 </div>
               )}
 
-              {/* Encomiendas */}
               {activeTab === 'encomiendas' && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Registro de Encomiendas</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tipo de Encomienda
-                      </label>
-                      <select
-                        value={encomiendas.tipo}
-                        onChange={(e) => setEncomiendas(prev => ({ ...prev, tipo: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                      >
-                        {tiposEncomienda.map(tipo => (
-                          <option key={tipo.valor} value={tipo.valor}>
-                            {tipo.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cantidad
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={encomiendas.cantidad || ''}
-                        onChange={(e) => setEncomiendas(prev => ({ 
-                          ...prev, 
-                          cantidad: parseInt(e.target.value) || 0 
-                        }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        placeholder="0"
-                      />
-                    </div>
-                    {encomiendas.cantidad > 0 && (
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <p className="text-sm text-blue-700">
-                          Total: {formatearPesos(parseInt(encomiendas.tipo) * encomiendas.cantidad)}
-                        </p>
-                      </div>
-                    )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#7c6f5a', marginBottom: 6, fontWeight: 600 }}>Tipo de Encomienda</label>
+                    <select className="input-field" value={encomiendas.tipo} onChange={e => setEncomiendas(p => ({ ...p, tipo: e.target.value }))}>
+                      {tiposEncomienda.map(t => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+                    </select>
                   </div>
-                  <button
-                    onClick={registrarEncomienda}
-                    className="w-full mt-4 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    ➕ Registrar Encomienda
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#7c6f5a', marginBottom: 6, fontWeight: 600 }}>Cantidad</label>
+                    <input type="number" min="0" placeholder="0" className="input-field"
+                      value={encomiendas.cantidad || ''}
+                      onChange={e => setEncomiendas(p => ({ ...p, cantidad: +e.target.value || 0 }))} />
+                  </div>
+                  {encomiendas.cantidad > 0 && (
+                    <div style={{ background: '#eef2ff', borderRadius: 10, padding: '12px 16px', border: '1.5px solid #c7d2fe' }}>
+                      <p style={{ color: '#4338ca', fontWeight: 700, margin: 0 }}>Total: {formatearPesos(+encomiendas.tipo * encomiendas.cantidad)}</p>
+                    </div>
+                  )}
+                  <button className="action-btn" onClick={registrarEncomienda}
+                    style={{ width: '100%', padding: '12px', background: '#6366f1', color: '#fff' }}>
+                    + Registrar Encomienda
                   </button>
                 </div>
               )}
 
-              {/* Facturas */}
               {activeTab === 'facturas' && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Registro de Facturas</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Concepto
-                      </label>
-                      <input
-                        type="text"
-                        value={factura.concepto}
-                        onChange={(e) => setFactura(prev => ({ ...prev, concepto: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        placeholder="Descripción del gasto"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Valor
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={factura.valor || ''}
-                        onChange={(e) => setFactura(prev => ({ 
-                          ...prev, 
-                          valor: parseInt(e.target.value) || 0 
-                        }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        placeholder="0"
-                      />
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#7c6f5a', marginBottom: 6, fontWeight: 600 }}>Concepto</label>
+                    <input type="text" placeholder="Descripción del gasto" className="input-field"
+                      value={factura.concepto} onChange={e => setFactura(p => ({ ...p, concepto: e.target.value }))} />
                   </div>
-                  <button
-                    onClick={registrarFactura}
-                    className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    ➖ Registrar Factura
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#7c6f5a', marginBottom: 6, fontWeight: 600 }}>Valor</label>
+                    <input type="number" min="0" placeholder="0" className="input-field"
+                      value={factura.valor || ''} onChange={e => setFactura(p => ({ ...p, valor: +e.target.value || 0 }))} />
+                  </div>
+                  <button className="action-btn" onClick={registrarFactura}
+                    style={{ width: '100%', padding: '12px', background: '#ef4444', color: '#fff' }}>
+                    − Registrar Factura (Egreso)
                   </button>
                 </div>
               )}
 
-              {/* Vales */}
               {activeTab === 'vales' && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Registro de Vales</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Concepto
-                      </label>
-                      <input
-                        type="text"
-                        value={vale.concepto}
-                        onChange={(e) => setVale(prev => ({ ...prev, concepto: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        placeholder="Descripción del vale"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Valor
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={vale.valor || ''}
-                        onChange={(e) => setVale(prev => ({ 
-                          ...prev, 
-                          valor: parseInt(e.target.value) || 0 
-                        }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        placeholder="0"
-                      />
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#7c6f5a', marginBottom: 6, fontWeight: 600 }}>Concepto</label>
+                    <input type="text" placeholder="Descripción del vale" className="input-field"
+                      value={vale.concepto} onChange={e => setVale(p => ({ ...p, concepto: e.target.value }))} />
                   </div>
-                  <button
-                    onClick={registrarVale}
-                    className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    ➖ Registrar Vale
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#7c6f5a', marginBottom: 6, fontWeight: 600 }}>Valor</label>
+                    <input type="number" min="0" placeholder="0" className="input-field"
+                      value={vale.valor || ''} onChange={e => setVale(p => ({ ...p, valor: +e.target.value || 0 }))} />
+                  </div>
+                  <button className="action-btn" onClick={registrarVale}
+                    style={{ width: '100%', padding: '12px', background: '#f97316', color: '#fff' }}>
+                    − Registrar Vale (Egreso)
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Historial */}
-          <div className="bg-white rounded-xl shadow-lg">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Historial de Movimientos</h3>
-                <button
-                  onClick={resetearDatos}
-                  className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded-md hover:bg-red-200 transition-colors"
-                >
-                  Resetear Todo
-                </button>
-              </div>
+          {/* ── Historial ── */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', maxHeight: 640 }}>
+            <div style={{ padding: '20px 20px 14px', borderBottom: '1.5px solid #e2d9c8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p className="caja-heading" style={{ fontSize: 17, color: '#1a1a2e', margin: 0 }}>Historial</p>
+              <button className="action-btn" onClick={resetearDatos}
+                style={{ background: '#fef2f2', color: '#dc2626', padding: '6px 12px', fontSize: 12 }}>
+                Resetear Todo
+              </button>
             </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
+            <div style={{ overflowY: 'auto', padding: 16, flex: 1 }}>
               {historial.length === 0 ? (
-                <p className="text-gray-500 text-center">No hay movimientos registrados</p>
-              ) : (
-                <div className="space-y-3">
-                  {historial.map((movimiento) => (
-                    <div
-                      key={movimiento.id}
-                      className={`p-3 rounded-lg border-l-4 ${
-                        movimiento.tipo === 'ingreso'
-                          ? 'bg-green-50 border-green-400'
-                          : 'bg-red-50 border-red-400'
-                      }`}
-                    >
-                      {editandoId === movimiento.id ? (
-                        // Modo edición
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editandoValores.detalle}
-                            onChange={(e) => setEditandoValores(prev => ({ ...prev, detalle: e.target.value }))}
-                            className="w-full text-sm border border-gray-300 rounded px-2 py-1"
-                          />
-                          <input
-                            type="number"
-                            value={editandoValores.valor}
-                            onChange={(e) => setEditandoValores(prev => ({ ...prev, valor: parseInt(e.target.value) || 0 }))}
-                            className="w-full text-sm border border-gray-300 rounded px-2 py-1"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => guardarEdicion(movimiento.id)}
-                              className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
-                            >
-                              <Save size={12} />
-                              Guardar
-                            </button>
-                            <button
-                              onClick={cancelarEdicion}
-                              className="flex items-center gap-1 bg-gray-600 text-white px-2 py-1 rounded text-xs hover:bg-gray-700"
-                            >
-                              <X size={12} />
-                              Cancelar
-                            </button>
-                          </div>
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af' }}>
+                  <p style={{ fontSize: 14 }}>Sin movimientos registrados</p>
+                </div>
+              ) : historial.map(m => (
+                <div key={m.id} className="hist-item" style={{
+                  background: m.tipo === 'ingreso' ? '#f0fdf4' : '#fef2f2',
+                  border: `1.5px solid ${m.tipo === 'ingreso' ? '#bbf7d0' : '#fecaca'}`,
+                }}>
+                  {editandoId === m.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      
+                      {/* LÓGICA DE EDICIÓN CONDICIONAL */}
+                      {editandoValores.desglose ? (
+                        // Si el registro tiene desglose (es billetes/monedas múltiples), mostramos cada denominación
+                        <div style={{ background: '#fff', borderRadius: 8, padding: '10px', border: '1px solid #e2d9c8' }}>
+                          <p style={{ fontSize: 12, color: '#7c6f5a', fontWeight: 600, margin: '0 0 8px' }}>Editar Cantidades:</p>
+                          {Object.entries(editandoValores.desglose).map(([denominacion, cantidad]) => (
+                            <div key={denominacion} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                              <span style={{ fontSize: 13, color: '#1a1a2e', width: '70px' }}>{formatearPesos(denominacion)}</span>
+                              <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                              <input type="number" min="0" className="input-field" style={{ padding: '6px', flex: 1 }}
+                                value={cantidad}
+                                onChange={(e) => {
+                                  const nuevaCantidad = parseInt(e.target.value) || 0;
+                                  setEditandoValores(prev => {
+                                    const nuevoDesglose = { ...prev.desglose, [denominacion]: nuevaCantidad };
+                                    
+                                    // Recalculamos el total automáticamente iterando sobre todas las monedas/billetes
+                                    let nuevoTotal = 0;
+                                    Object.entries(nuevoDesglose).forEach(([d, c]) => { nuevoTotal += Number(d) * c; });
+                                    
+                                    return { ...prev, desglose: nuevoDesglose, valor: nuevoTotal };
+                                  });
+                                }}
+                              />
+                            </div>
+                          ))}
                         </div>
                       ) : (
-                        // Modo visualización
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {movimiento.detalle}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {movimiento.fecha}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-sm font-bold ${
-                                movimiento.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
-                              }`}
-                            >
-                              {movimiento.tipo === 'ingreso' ? '+' : '-'}
-                              {formatearPesos(movimiento.valor)}
-                            </span>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => editarMovimiento(movimiento.id)}
-                                className="text-blue-600 hover:text-blue-800 p-1"
-                                title="Editar"
-                              >
-                                <Edit size={12} />
-                              </button>
-                              <button
-                                onClick={() => eliminarMovimiento(movimiento.id)}
-                                className="text-red-600 hover:text-red-800 p-1"
-                                title="Eliminar"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        // Si NO tiene desglose (Facturas, Vales, Encomiendas o registros viejos), mostramos la edición simple
+                        <>
+                          <input className="input-field" value={editandoValores.detalle} placeholder="Detalle del registro"
+                            onChange={e => setEditandoValores(p => ({ ...p, detalle: e.target.value }))} />
+                          <input type="number" className="input-field" value={editandoValores.valor} placeholder="Valor"
+                            onChange={e => setEditandoValores(p => ({ ...p, valor: +e.target.value || 0 }))} />
+                        </>
                       )}
+
+                      {/* Muestra visual del Total Calculado */}
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e', textAlign: 'right', padding: '4px 0' }}>
+                        Total recalculado: {formatearPesos(editandoValores.valor || 0)}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="action-btn" onClick={() => guardarEdicion(m.id)}
+                          style={{ flex: 1, padding: '6px', background: '#10b981', color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <Save size={12} /> Guardar
+                        </button>
+                        <button className="action-btn" onClick={() => setEditandoId(null)}
+                          style={{ flex: 1, padding: '6px', background: '#6b7280', color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <X size={12} /> Cancelar
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          {m.tipo === 'ingreso'
+                            ? <TrendingUp size={13} color="#10b981" />
+                            : <TrendingDown size={13} color="#ef4444" />}
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {m.detalle}
+                          </p>
+                        </div>
+                        <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{m.fecha}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: m.tipo === 'ingreso' ? '#059669' : '#dc2626' }}>
+                          {m.tipo === 'ingreso' ? '+' : '-'}{formatearPesos(m.valor)}
+                        </span>
+                        <button onClick={() => {
+                          setEditandoId(m.id);
+                          // Al editar, copiamos todo (incluyendo el nuevo desglose si existe)
+                          setEditandoValores({
+                            detalle: m.detalle,
+                            valor: m.valor,
+                            desglose: m.desglose ? { ...m.desglose } : null
+                          });
+                        }}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#6366f1', padding: 3 }}>
+                          <Edit size={13} />
+                        </button>
+                        <button onClick={() => eliminarMovimiento(m.id)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: 3 }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default CajaMenorControl;
+}
