@@ -109,12 +109,12 @@ export default function App() {
           borderRadius: 100,
           boxShadow: '0 4px 12px rgba(26,26,46,0.08)',
           border: '1.5px solid rgba(226, 217, 200, 0.5)',
-          pointerEvents: 'auto' // Reactiva los clics solo en la pastilla
+          pointerEvents: 'auto'
         }}>
           <p style={{ color: '#7c6f5a', fontSize: 12, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
             Desarrollado por{' '}
             <a
-              href="www.linkedin.com/in/yerson-rodriguez"
+              href="https://www.linkedin.com/in/yerson-rodriguez" // <-- Aquí estaba el error
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -130,8 +130,6 @@ export default function App() {
           </p>
         </div>
       </div>
-
-
     </div>
   );
 
